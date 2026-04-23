@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Accretion Disk Simulation</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap");
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --gold: #ffaa00;
+        --orange: #ff6600;
+        --deep: #050510;
+        --panel: rgba(10, 12, 30, 0.85);
+        --border: rgba(255, 170, 0, 0.15);
+        --text: #c8cee8;
+        --dim: #5a6080;
+      }
+
+      body {
+        background: var(--deep);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: "Space Mono", monospace;
+        overflow: hidden;
+      }
+
+      /* Starfield background */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          radial-gradient(
+            1px 1px at 10% 20%,
+            rgba(255, 255, 255, 0.4) 0%,
+            transparent 100%
+          ),
+          radial-gradient(
+            1px 1px at 30% 70%,
+            rgba(255, 255, 255, 0.3) 0%,
+            transparent 100%
+          ),
+          radial-gradient(
+            1px 1px at 50% 40%,
+            rgba(255, 255, 255, 0.5) 0%,
+            transparent 100%
+          ),
+          radial-gradient(
+            1px 1px at 70% 80%,
+            rgba(255, 255, 255, 0.3) 0%,
+            transparent 100%
+          ),
+          radial-gradient(
+            1px 1px at 85% 15%,
+            rgba(255, 255, 255, 0.4) 0%,
+            transparent 100%
+          ),
+          radial-gradient(
+            1px 1px at 20% 90%,
+            rgba(255, 255, 255, 0.2) 0%,
+            transparent 100%
+          ),
+          radial-gradient(
+            1px 1px at 60% 10%,
+            rgba(255, 255, 255, 0.4) 0%,
+            transparent 100%
+          ),
+          radial-gradient(
+            1px 1px at 90% 60%,
+            rgba(255, 255, 255, 0.3) 0%,
+            transparent 100%
+          );
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .wrapper {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+
+      /* Header */
+      .header {
+        width: 820px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 0 4px 10px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 12px;
+      }
+
+      .header h1 {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 20px;
+        color: #fff;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .header h1 span {
+        color: var(--gold);
+      }
+
+      .header .tag {
+        font-size: 10px;
+        color: var(--dim);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      /* Canvas */
+      canvas {
+        display: block;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        box-shadow:
+          0 0 60px rgba(255, 100, 0, 0.08),
+          0 0 120px rgba(0, 0, 0, 0.6),
+          inset 0 0 40px rgba(0, 0, 0, 0.4);
+      }
+
+      /* Controls panel */
+      .controls {
+        width: 820px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        padding: 14px 20px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        backdrop-filter: blur(10px);
+      }
+
+      .slider-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .slider-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 11px;
+        color: var(--dim);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .slider-label .val {
+        color: var(--gold);
+        font-weight: 700;
+        font-size: 13px;
+        min-width: 36px;
+      }
+
+      .slider-label .range-hint {
+        margin-left: auto;
+        font-size: 10px;
+        color: #333a5a;
+      }
+
+      /* Custom range slider */
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(
+          to right,
+          #1a2040 0%,
+          var(--gold) var(--pct, 50%),
+          #1a2040 var(--pct, 50%)
+        );
+        outline: none;
+        cursor: pointer;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--gold);
+        box-shadow: 0 0 8px rgba(255, 170, 0, 0.6);
+        cursor: pointer;
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+        box-shadow: 0 0 14px rgba(255, 170, 0, 0.9);
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--gold);
+        border: none;
+        box-shadow: 0 0 8px rgba(255, 170, 0, 0.6);
+        cursor: pointer;
+      }
+
+      /* Buttons */
+      .btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      button {
+        font-family: "Space Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        border-radius: 4px;
+        padding: 7px 14px;
+        border: 1px solid;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+
+      #resetBtn {
+        background: transparent;
+        border-color: var(--gold);
+        color: var(--gold);
+      }
+
+      #resetBtn:hover {
+        background: rgba(255, 170, 0, 0.1);
+        box-shadow: 0 0 12px rgba(255, 170, 0, 0.3);
+      }
+
+      #trailToggle {
+        background: transparent;
+        border-color: #334;
+        color: var(--dim);
+      }
+
+      #trailToggle:hover {
+        border-color: #556;
+        color: var(--text);
+      }
+
+      #trailToggle.active {
+        border-color: #5588bb;
+        color: #88aadd;
+      }
+
+      /* Stats overlay row */
+      .stats-row {
+        width: 820px;
+        display: flex;
+        gap: 20px;
+        padding: 8px 4px 0;
+      }
+
+      .stat {
+        font-size: 10px;
+        color: var(--dim);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .stat span {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      /* Sentiment bar */
+      .sentiment-row {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 10px;
+        color: #333a5a;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        margin-top: 2px;
+      }
+
+      .sentiment-bar {
+        flex: 1;
+        height: 2px;
+        background: #1a2040;
+        border-radius: 1px;
+        position: relative;
+        overflow: visible;
+      }
+
+      .sentiment-bar::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        left: var(--pos, 50%);
+        width: 6px;
+        height: 6px;
+        background: var(--gold);
+        border-radius: 50%;
+        box-shadow: 0 0 6px var(--gold);
+        transition: left 0.3s ease;
+        margin-left: -3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="header">
+        <h1>Accretion <span>Disk</span> Simulation</h1>
+        <span class="tag">Symplectic Euler · N-Body · 600 particles</span>
+      </div>
+
+      <canvas id="universeCanvas" width="820" height="540"></canvas>
+
+      <div class="controls">
+        <div class="slider-row">
+          <div class="slider-label">
+            Gravitational Constant G
+            <span id="gValue" class="val">1.20</span>
+            <span class="range-hint"
+              >0.1 ← weak &nbsp;|&nbsp; strong → 2.0</span
+            >
+          </div>
+          <input
+            type="range"
+            id="gSlider"
+            min="0.1"
+            max="2.0"
+            step="0.01"
+            value="1.2"
+          />
+          <div class="sentiment-row">
+            <span>Sad / Dispersed</span>
+            <div class="sentiment-bar" id="sentimentBar"></div>
+            <span>Dense / Energetic</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button id="resetBtn">↺ Reset Disk</button>
+          <button id="trailToggle">Trails: On</button>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat">FPS <span id="fpsDisplay">60</span></div>
+        <div class="stat">Particles <span id="particleDisplay">600</span></div>
+        <div class="stat">
+          Particle[0] x=<span id="p0x">0.0</span> y=<span id="p0y">0.0</span>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      // ============================================================
+      // AccretionDiskModel – With visible velocity scaling
+      // ============================================================
+      class AccretionDiskModel {
+        constructor(particleCount = 600, spreadRadius = 220) {
+          this.G = 200; // Starting G (strong but stable)
+          this.STAR_MASS = 1.0;
+          this.MIN_DISTANCE = 5.0;
+          this.VELOCITY_SCALE = 120; // Multiplier for visual speed
+          this.particleCount = particleCount;
+          this.x = new Float32Array(particleCount);
+          this.y = new Float32Array(particleCount);
+          this.vx = new Float32Array(particleCount);
+          this.vy = new Float32Array(particleCount);
+          this.resetParticles(spreadRadius);
+        }
+
+        resetParticles(spreadRadius = 220) {
+          const minRadius = 25;
+          for (let i = 0; i < this.particleCount; i++) {
+            const angle = Math.random() * 2 * Math.PI;
+            const radius =
+              minRadius + (spreadRadius - minRadius) * Math.sqrt(Math.random());
+            this.x[i] = radius * Math.cos(angle);
+            this.y[i] = radius * Math.sin(angle);
+
+            // Circular orbit speed scaled for visible motion
+            const vCirc =
+              Math.sqrt((this.G * this.STAR_MASS) / radius) *
+              this.VELOCITY_SCALE;
+            const tx = -Math.sin(angle);
+            const ty = Math.cos(angle);
+            const ecc = 0.7 + Math.random() * 0.6;
+            this.vx[i] = tx * vCirc * ecc;
+            this.vy[i] = ty * vCirc * ecc;
+          }
+        }
+
+        setGravityFromSentiment(score) {
+          // Map -1..1 to G range 30..500 (visible and stable)
+          const clamped = Math.max(-1, Math.min(1, score));
+          this.G = 30 + (clamped + 1) * 235; // -1→30, 0→265, 1→500
+        }
+
+        tick(dt) {
+          for (let i = 0; i < this.particleCount; i++) {
+            const dx = -this.x[i];
+            const dy = -this.y[i];
+            const distSq = dx * dx + dy * dy;
+            const dist = Math.sqrt(distSq);
+
+            if (dist < this.MIN_DISTANCE) {
+              const angle = Math.random() * 2 * Math.PI;
+              const radius = 150 + Math.random() * 120;
+              this.x[i] = Math.cos(angle) * radius;
+              this.y[i] = Math.sin(angle) * radius;
+              const vCirc =
+                Math.sqrt((this.G * this.STAR_MASS) / radius) *
+                this.VELOCITY_SCALE;
+              const tx = -Math.sin(angle);
+              const ty = Math.cos(angle);
+              this.vx[i] = tx * vCirc * (0.7 + Math.random() * 0.6);
+              this.vy[i] = ty * vCirc * (0.7 + Math.random() * 0.6);
+              continue;
+            }
+
+            const force =
+              ((this.G * this.STAR_MASS) / distSq) * this.VELOCITY_SCALE;
+            const ax = (dx / dist) * force;
+            const ay = (dy / dist) * force;
+
+            // Symplectic Euler
+            this.vx[i] += ax * dt;
+            this.vy[i] += ay * dt;
+            this.x[i] += this.vx[i] * dt;
+            this.y[i] += this.vy[i] * dt;
+          }
+        }
+
+        getParticleData() {
+          return { x: this.x, y: this.y, count: this.particleCount };
+        }
+        setGravity(v) {
+          this.G = v;
+        }
+        getGravity() {
+          return this.G;
+        }
+      }
+
+      // ============================================================
+      // Canvas & Controls Setup (updated G range)
+      // ============================================================
+      const canvas = document.getElementById("universeCanvas");
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width,
+        H = canvas.height;
+      const CX = W / 2,
+        CY = H / 2;
+
+      const gSlider = document.getElementById("gSlider");
+      const gValueSpan = document.getElementById("gValue");
+      const resetBtn = document.getElementById("resetBtn");
+      const trailToggle = document.getElementById("trailToggle");
+      const sentimentBar = document.getElementById("sentimentBar");
+      const fpsDisplay = document.getElementById("fpsDisplay");
+      const p0xDisplay = document.getElementById("p0x");
+      const p0yDisplay = document.getElementById("p0y");
+
+      // Adjust slider range to match visible G values
+      gSlider.min = "30";
+      gSlider.max = "500";
+      gSlider.step = "1";
+      gSlider.value = "200";
+
+      const model = new AccretionDiskModel(600, 220);
+      model.setGravity(200);
+      gValueSpan.textContent = "200";
+
+      let trailsEnabled = true;
+      let lastTime = performance.now();
+      let frameCount = 0,
+        fpsTimer = 0,
+        currentFps = 60;
+
+      function updateSliderFill() {
+        const min = parseFloat(gSlider.min);
+        const max = parseFloat(gSlider.max);
+        const val = parseFloat(gSlider.value);
+        const pct = ((val - min) / (max - min)) * 100;
+        gSlider.style.setProperty("--pct", pct + "%");
+        sentimentBar.style.setProperty("--pos", pct + "%");
+      }
+
+      gSlider.addEventListener("input", (e) => {
+        const val = parseFloat(e.target.value);
+        model.setGravity(val);
+        gValueSpan.textContent = val.toFixed(0);
+        updateSliderFill();
+      });
+
+      resetBtn.addEventListener("click", () => {
+        model.resetParticles(220);
+      });
+
+      trailToggle.addEventListener("click", () => {
+        trailsEnabled = !trailsEnabled;
+        trailToggle.textContent = trailsEnabled ? "Trails: On" : "Trails: Off";
+        trailToggle.classList.toggle("active", trailsEnabled);
+      });
+
+      updateSliderFill();
+
+      // ============================================================
+      // Drawing (unchanged except maybe star glow)
+      // ============================================================
+      function draw() {
+        if (trailsEnabled) {
+          ctx.fillStyle = "rgba(5, 5, 16, 0.45)";
+          ctx.fillRect(0, 0, W, H);
+        } else {
+          ctx.clearRect(0, 0, W, H);
+          ctx.fillStyle = "#050510";
+          ctx.fillRect(0, 0, W, H);
+        }
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 200, 100, 0.06)";
+        ctx.lineWidth = 1;
+        for (const r of [80, 150, 220]) {
+          ctx.beginPath();
+          ctx.arc(CX, CY, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        const data = model.getParticleData();
+        const xArr = data.x,
+          yArr = data.y;
+
+        for (let i = 0; i < data.count; i++) {
+          const px = CX + xArr[i];
+          const py = CY + yArr[i];
+          if (px < -60 || px > W + 60 || py < -60 || py > H + 60) continue;
+
+          const dist = Math.sqrt(xArr[i] * xArr[i] + yArr[i] * yArr[i]);
+          const normDist = Math.min(dist / 280, 1);
+          const hue = 200 + (1 - normDist) * 160;
+          const sat = 80 + (1 - normDist) * 20;
+          const light = 50 + (1 - normDist) * 30;
+
+          ctx.beginPath();
+          ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
+          if (dist < 110) {
+            ctx.shadowColor = `hsl(${hue}, 90%, 65%)`;
+            ctx.shadowBlur = 6;
+          }
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, 28);
+        grad.addColorStop(0, "#ffffff");
+        grad.addColorStop(0.2, "#ffee88");
+        grad.addColorStop(0.6, "#ff6600");
+        grad.addColorStop(1, "rgba(80,10,0,0)");
+        ctx.shadowColor = "#ffaa00";
+        ctx.shadowBlur = 40;
+        ctx.beginPath();
+        ctx.arc(CX, CY, 14, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.font = '11px "Space Mono", monospace';
+        ctx.fillStyle = "rgba(150, 160, 200, 0.5)";
+        ctx.fillText(`G = ${model.getGravity().toFixed(0)}`, 16, 24);
+        ctx.fillText(`FPS ${currentFps}`, 16, 40);
+      }
+
+      // ============================================================
+      // Fixed-timestep loop (dt = 1/60, 3 substeps)
+      // ============================================================
+      const FIXED_DT = 1 / 60;
+      const SUBSTEPS = 3;
+      let statsFrame = 0;
+
+      function loop(now) {
+        const elapsed = now - lastTime;
+        lastTime = now;
+        fpsTimer += elapsed;
+        frameCount++;
+        if (fpsTimer >= 500) {
+          currentFps = Math.round(frameCount / (fpsTimer / 1000));
+          fpsDisplay.textContent = currentFps;
+          fpsTimer = 0;
+          frameCount = 0;
+        }
+
+        for (let s = 0; s < SUBSTEPS; s++) {
+          model.tick(FIXED_DT / SUBSTEPS);
+        }
+
+        draw();
+
+        if (++statsFrame % 10 === 0) {
+          const d = model.getParticleData();
+          p0xDisplay.textContent = d.x[0].toFixed(1);
+          p0yDisplay.textContent = d.y[0].toFixed(1);
+        }
+
+        requestAnimationFrame(loop);
+      }
+
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>

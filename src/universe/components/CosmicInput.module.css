@@ -1,0 +1,126 @@
+.overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 40px 20px 50px;
+    z-index: 10;
+    background: linear-gradient(to top, rgba(5, 5, 16, 0.8) 0%, transparent 80%);
+    pointer-events: none;
+}
+
+.form {
+    pointer-events: all;
+    width: 100%;
+    max-width: 700px;
+}
+
+.inputWrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.prompt {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #5a6080;
+    transition: color 0.4s;
+}
+
+.flarePositive {
+    filter: drop-shadow(0 0 12px rgba(255, 170, 0, 0.3));
+}
+
+.flareNegative {
+    filter: drop-shadow(0 0 12px rgba(100, 80, 255, 0.3));
+}
+
+.input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 16px 0;
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffffff;
+    text-align: center;
+    outline: none;
+    caret-color: #ffaa00;
+    transition: border-color 0.4s, color 0.4s;
+    letter-spacing: 0.04em;
+}
+
+.input::placeholder {
+    color: rgba(200, 206, 232, 0.3);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+}
+
+.input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.input:focus {
+    border-bottom-color: rgba(255, 170, 0, 0.6);
+}
+
+.indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #5a6080;
+    transition: background 0.3s, box-shadow 0.3s;
+}
+
+.dot.loading {
+    background: #ffaa00;
+    box-shadow: 0 0 8px #ffaa00;
+    animation: pulse 1.2s infinite;
+}
+
+.dot.thinking {
+    background: #ffaa00;
+    box-shadow: 0 0 8px #ffaa00;
+    animation: pulse 0.6s infinite;
+}
+
+.dot.positiveDot {
+    background: #ffaa00;
+    box-shadow: 0 0 8px #ffaa00;
+}
+
+.dot.negativeDot {
+    background: #7c6bff;
+    box-shadow: 0 0 8px #7c6bff;
+}
+
+.dotLabel {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: #5a6080;
+    text-transform: uppercase;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.5); }
+}
