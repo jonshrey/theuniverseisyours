@@ -1,37 +1,32 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import { UniverseEngine } from "../engine/UniverseEngine";
-import { useAnimationFrame } from "../engine/useAnimationFrame";
-import { useUniverseStore } from "../store/universeStore";
-import type {
-  CelestialEntity,
-  Renderable,
-  AccretionDiskData,
-} from "../../lib/types";
-import styles from "./AccretionDiskCanvas.module.css";
+// src/universe/components/AccretionDiskCanvas.tsx
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { UniverseEngine } from '../engine/UniverseEngine';
+import { useAnimationFrame } from '../engine/useAnimationFrame';
+import { useUniverseStore } from '../store/universeStore';
+import type { CelestialEntity, Renderable, AccretionDiskData } from '../../lib/types';
+import styles from './AccretionDiskCanvas.module.css';
 
 export function AccretionDiskCanvas() {
   // ---------- Refs ----------
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<UniverseEngine | null>(null);
-  const entityRef = useRef<CelestialEntity | null>(null);
-  const planetsRef = useRef<CelestialEntity[]>([]);
+  const entityRef = useRef<CelestialEntity | null>(null); // always holds the current accretion disk
 
   // ---------- Canvas dimensions ----------
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
-  // ---------- Zustand: gravity (derived from sentiment) ----------
+  // ---------- Zustand ----------
   const gravity = useUniverseStore((state) => state.gravity);
+  const planetEntities = useUniverseStore((state) => state.planetEntities);
 
-  // ---------- Create engine & entity once ----------
+  // ---------- Create engine & disk entity once ----------
   useEffect(() => {
-    // Initialise engine with default config (size will be updated by resize)
     engineRef.current = new UniverseEngine({
       canvasWidth: dimensions.width,
       canvasHeight: dimensions.height,
       globalGravity: gravity,
     });
 
-    // Create the single accretion disk entity
     const particleCount = 800;
     const diskData: AccretionDiskData = {
       particleCount,
@@ -44,17 +39,16 @@ export function AccretionDiskCanvas() {
       },
     };
 
-    // Initialise particles in a ring
+    // Seed particles
     const minRadius = 25;
     const spreadRadius = diskData.spreadRadius;
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * 2 * Math.PI;
-      const radius =
-        minRadius + (spreadRadius - minRadius) * Math.sqrt(Math.random());
+      const radius = minRadius + (spreadRadius - minRadius) * Math.sqrt(Math.random());
       diskData.particles.x[i] = radius * Math.cos(angle);
       diskData.particles.y[i] = radius * Math.sin(angle);
 
-      const vCirc = Math.sqrt((gravity * 1.0) / radius) * 120; // STAR_MASS=1, VELOCITY_SCALE=120
+      const vCirc = Math.sqrt((gravity * 1.0) / radius) * 50; // STAR_MASS=1, VELOCITY_SCALE=50
       const tx = -Math.sin(angle);
       const ty = Math.cos(angle);
       const ecc = 0.7 + Math.random() * 0.6;
@@ -62,37 +56,17 @@ export function AccretionDiskCanvas() {
       diskData.particles.vy[i] = ty * vCirc * ecc;
     }
 
-    const entity: CelestialEntity = {
-      id: "sentiment-disk",
-      type: "accretionDisk",
+    const diskEntity: CelestialEntity = {
+      id: 'sentiment-disk',
+      type: 'accretionDisk',
       position: { x: dimensions.width / 2, y: dimensions.height / 2 },
       data: diskData,
-      color: undefined,
-      size: undefined,
     };
 
-    entityRef.current = entity;
+    entityRef.current = diskEntity;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Create a test planet
-    const planetEntity: CelestialEntity = {
-      id: "planet-coffee",
-      type: "planet",
-      position: { x: dimensions.width / 2, y: dimensions.height / 2 },
-      data: {
-        orbitRadius: 140,
-        angle: Math.random() * Math.PI * 2,
-        speed: 0.3,
-        name: "Coffee ☕",
-        description: "My fuel source",
-        color: "#ffaa55",
-      },
-    };
-    planetsRef.current = [planetEntity];
-
-    // Cleanup (no special teardown needed)
-  }, []); // Runs once on mount
-
-  // ---------- Sync engine config with canvas size & gravity ----------
+  // ---------- Sync engine config (size & gravity) ----------
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.setConfig({
@@ -100,6 +74,13 @@ export function AccretionDiskCanvas() {
         canvasHeight: dimensions.height,
         globalGravity: gravity,
       });
+    }
+    // Also keep the disk centred when resizing
+    if (entityRef.current) {
+      entityRef.current.position = {
+        x: dimensions.width / 2,
+        y: dimensions.height / 2,
+      };
     }
   }, [dimensions, gravity]);
 
@@ -113,21 +94,13 @@ export function AccretionDiskCanvas() {
           setDimensions({ width: clientWidth, height: clientHeight });
           canvasRef.current.width = clientWidth;
           canvasRef.current.height = clientHeight;
-
-          // Also update the entity's position to stay centred
-          if (entityRef.current) {
-            entityRef.current.position = {
-              x: clientWidth / 2,
-              y: clientHeight / 2,
-            };
-          }
         }
       }
     };
 
     handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // ---------- Draw function ----------
@@ -135,18 +108,17 @@ export function AccretionDiskCanvas() {
     (renderables: Renderable[]) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
       const { width, height } = canvas;
 
       // Trail effect
-      ctx.fillStyle = "rgba(5, 5, 16, 0.15)";
+      ctx.fillStyle = 'rgba(5, 5, 16, 0.15)';
       ctx.fillRect(0, 0, width, height);
 
       for (const r of renderables) {
-        if (r.type === "particle") {
-          // Particle rendering (same as before)
+        if (r.type === 'particle') {
           ctx.beginPath();
           ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
           ctx.fillStyle = r.color;
@@ -155,21 +127,18 @@ export function AccretionDiskCanvas() {
           ctx.fill();
 
           ctx.shadowBlur = 0;
-          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fillStyle = 'rgba(255,255,255,0.9)';
           ctx.beginPath();
           ctx.arc(r.x, r.y, r.size * 0.4, 0, Math.PI * 2);
           ctx.fill();
-        } else if (r.type === "circle") {
-          // Draw a circular orbit or a planet dot
+        } else if (r.type === 'circle') {
           ctx.beginPath();
           if (r.meta?.isOrbit) {
-            // Faint orbit ring
             ctx.strokeStyle = r.color;
             ctx.lineWidth = r.size || 1;
             ctx.arc(r.x, r.y, r.radius ?? 100, 0, Math.PI * 2);
             ctx.stroke();
           } else {
-            // Planet body
             ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
             ctx.fillStyle = r.color;
             ctx.shadowColor = r.color;
@@ -177,44 +146,35 @@ export function AccretionDiskCanvas() {
             ctx.fill();
             ctx.shadowBlur = 0;
           }
-        } else if (r.type === "text") {
-          // Draw label
+        } else if (r.type === 'text') {
           ctx.font = `${r.size || 12}px "Space Mono", monospace`;
           ctx.fillStyle = r.color;
           ctx.globalAlpha = r.opacity;
-          ctx.fillText((r.meta?.text as string) ?? "", r.x, r.y);
+          ctx.fillText((r.meta?.text as string) ?? '', r.x, r.y);
           ctx.globalAlpha = 1;
         }
       }
 
-      // Central star (unchanged)
+      // Central star (still drawn here for now – could become a 'star' entity later)
       const cx = width / 2;
       const cy = height / 2;
-      const starRadius =
-        20 + 15 * (gravity / 500) * (0.8 + 0.4 * Math.sin(Date.now() * 0.003));
-      const starGradient = ctx.createRadialGradient(
-        cx,
-        cy,
-        0,
-        cx,
-        cy,
-        starRadius,
-      );
-      starGradient.addColorStop(0, "#ffffff");
-      starGradient.addColorStop(0.2, "#fff0c0");
+      const starRadius = 20 + 15 * (gravity / 500) * (0.8 + 0.4 * Math.sin(Date.now() * 0.003));
+      const starGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, starRadius);
+      starGradient.addColorStop(0, '#ffffff');
+      starGradient.addColorStop(0.2, '#fff0c0');
       starGradient.addColorStop(0.6, `hsl(${35 + gravity * 0.02}, 100%, 60%)`);
-      starGradient.addColorStop(1, "rgba(80, 0, 0, 0)");
+      starGradient.addColorStop(1, 'rgba(80, 0, 0, 0)');
 
       ctx.beginPath();
       ctx.arc(cx, cy, starRadius, 0, Math.PI * 2);
       ctx.fillStyle = starGradient;
-      ctx.shadowColor = "#ffaa00";
+      ctx.shadowColor = '#ffaa00';
       ctx.shadowBlur = 40 * (gravity / 500);
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Faint guide rings (optional)
-      ctx.strokeStyle = "rgba(255, 200, 100, 0.06)";
+      // Optional guide rings
+      ctx.strokeStyle = 'rgba(255, 200, 100, 0.06)';
       ctx.lineWidth = 1;
       for (const r of [100, 180, 260]) {
         ctx.beginPath();
@@ -222,19 +182,19 @@ export function AccretionDiskCanvas() {
         ctx.stroke();
       }
     },
-    [gravity],
+    [gravity]
   );
 
   // ---------- Animation loop ----------
   useAnimationFrame((deltaTime) => {
     const engine = engineRef.current;
-    if (!engine) return;
-
     const disk = entityRef.current;
-    if (!disk) return;
+    if (!engine || !disk) return;
 
-    const entities: CelestialEntity[] = [disk, ...planetsRef.current];
+    // Combine disk entity with any planets from the store
+    const entities: CelestialEntity[] = [disk, ...planetEntities];
 
+    // Sub‑steps for stability
     const substeps = 3;
     for (let s = 0; s < substeps; s++) {
       engine.tick(entities, deltaTime / substeps);
@@ -243,6 +203,7 @@ export function AccretionDiskCanvas() {
     const renderables = engine.getRenderables(entities);
     draw(renderables);
   });
+
   return (
     <div className={styles.container}>
       <canvas

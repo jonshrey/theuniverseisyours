@@ -4,7 +4,6 @@ import type {
   Renderable,
   UniverseConfig,
   AccretionDiskData,
-  PlanetData,
 } from '../../lib/types';
 
 export class UniverseEngine {
@@ -36,10 +35,7 @@ export class UniverseEngine {
         case 'accretionDisk':
           this.updateAccretionDisk(entity.data, deltaTime, G);
           break;
-        case 'planet':
-          this.updatePlanet(entity.data, deltaTime);
-          break;
-        // future cases…
+        // Planets are static – no physics update needed
       }
     }
   }
@@ -144,44 +140,32 @@ export class UniverseEngine {
   }
 
   // ------------------------------------------------------------------
-  //  PLANET
+  //  PLANET (static position, spawn animation)
   // ------------------------------------------------------------------
-  private updatePlanet(data: PlanetData, deltaTime: number): void {
-    // Advance the angle based on angular speed
-    data.angle += data.speed * deltaTime;
-    // Keep angle within [0, 2π] for cleanliness (optional)
-    data.angle = data.angle % (Math.PI * 2);
-  }
-
   private renderPlanet(entity: CelestialEntity & { type: 'planet' }): Renderable[] {
     const { id, position, data, color } = entity;
-    const px = position.x + Math.cos(data.angle) * data.orbitRadius;
-    const py = position.y + Math.sin(data.angle) * data.orbitRadius;
+
+    const age = data.spawnTime ? (Date.now() - data.spawnTime) / 1000 : 999;
+    const scale = Math.min(1, age / 0.8);
+    const opacity = Math.min(1, age / 0.5);
+
+    const px = position.x + data.x;
+    const py = position.y + data.y;
 
     return [
-      {
-        id: `${id}-orbit`,
-        type: 'circle',
-        x: position.x,
-        y: position.y,
-        radius: data.orbitRadius,
-        color: 'rgba(255,255,255,0.05)',
-        size: 1,
-        opacity: 1,
-        meta: { isOrbit: true },
-      },
       {
         id: `${id}-planet`,
         type: 'circle',
         x: px,
         y: py,
-        color: color || '#88ccff',
-        size: 8,
-        opacity: 1,
+        color: color ?? '#88ccff',
+        size: 8 * scale,
+        opacity,
         meta: {
           name: data.name,
           description: data.description,
           isPlanet: true,
+          spawnTime: data.spawnTime,
         },
       },
       {
@@ -191,7 +175,7 @@ export class UniverseEngine {
         y: py - 12,
         color: '#ffffff',
         size: 12,
-        opacity: 0.9,
+        opacity: 0.9 * opacity,
         meta: { text: data.name },
       },
     ];

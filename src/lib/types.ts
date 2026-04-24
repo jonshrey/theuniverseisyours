@@ -16,13 +16,14 @@ export interface AccretionDiskData {
 }
 
 export interface PlanetData {
-  orbitRadius: number; // distance from the central star
-  angle: number; // current angle in radians
-  speed: number; // angular speed (radians per second)
+  /** Offset from the entity origin (canvas centre) */
+  x: number;
+  y: number;
   name: string;
   description?: string;
-  color?: string; // override colour
-  icon?: string; // emoji or glyph
+  color?: string;
+  icon?: string;
+  spawnTime?: number; // for fade‑in animation
 }
 export interface StarData {
   temperature: number; // Kelvin, drives colour
