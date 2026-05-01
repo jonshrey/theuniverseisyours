@@ -1,11 +1,9 @@
 // src/ai/hooks/useSentimentWorker.ts
 import { useEffect, useRef, useCallback } from 'react';
 import { useUniverseStore } from '../../universe/store/universeStore';
-
-// Vite worker import – tells Vite to bundle this as a Web Worker
 import SentimentWorker from '../worker/sentiment.worker?worker';
 
-// Message types (should match the worker)
+// Message types
 interface WorkerMessage {
   type: 'LOAD_MODEL' | 'ANALYZE';
   payload?: { text: string };
@@ -20,14 +18,15 @@ export function useSentimentWorker() {
   const workerRef = useRef<Worker | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const {
-    setModelLoading,
-    setProcessing,
-    setSentimentScore,
-  } = useUniverseStore();
+  // Actions – stable references from Zustand
+  const setModelLoading = useUniverseStore((state) => state.setModelLoading);
+  const setProcessing = useUniverseStore((state) => state.setProcessing);
+  const setSentimentScore = useUniverseStore((state) => state.setSentimentScore);
 
-  // Initialize worker on mount
+  // Create worker only once
   useEffect(() => {
+    if (workerRef.current) return; // already created
+
     const worker = new SentimentWorker();
     workerRef.current = worker;
 
@@ -36,12 +35,16 @@ export function useSentimentWorker() {
 
       switch (type) {
         case 'LOADING_PROGRESS':
-          setModelLoading(true);
-          // Optionally store progress if needed
+          // Only update if not already loading (prevents unnecessary renders)
+          if (!useUniverseStore.getState().isModelLoading) {
+            setModelLoading(true);
+          }
           break;
 
         case 'MODEL_LOADED':
-          setModelLoading(false);
+          if (useUniverseStore.getState().isModelLoading) {
+            setModelLoading(false);
+          }
           break;
 
         case 'ANALYSIS_RESULT':
@@ -54,16 +57,19 @@ export function useSentimentWorker() {
         case 'ERROR':
           console.error('Worker error:', payload?.message);
           setProcessing(false);
-          setModelLoading(false);
+          if (useUniverseStore.getState().isModelLoading) {
+            setModelLoading(false);
+          }
           break;
       }
     };
 
-    // Start loading the model immediately
+    // Start loading the model
     worker.postMessage({ type: 'LOAD_MODEL' } as WorkerMessage);
 
     return () => {
       worker.terminate();
+      workerRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -71,12 +77,10 @@ export function useSentimentWorker() {
   const analyze = useCallback((text: string) => {
     if (!workerRef.current) return;
 
-    // Clear previous timer
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
 
-    // Set a new timer (800ms debounce)
     debounceTimer.current = setTimeout(() => {
       if (workerRef.current && text.trim().length > 0) {
         setProcessing(true);
@@ -88,7 +92,7 @@ export function useSentimentWorker() {
     }, 800);
   }, [setProcessing]);
 
-  // Cleanup debounce timer on unmount
+  // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
       if (debounceTimer.current) {

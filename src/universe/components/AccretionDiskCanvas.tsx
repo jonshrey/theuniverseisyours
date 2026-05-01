@@ -18,6 +18,7 @@ export function AccretionDiskCanvas() {
   // ---------- Zustand ----------
   const gravity = useUniverseStore((state) => state.gravity);
   const planetEntities = useUniverseStore((state) => state.planetEntities);
+  const highlightedPlanetIds = useUniverseStore((state) => state.highlightedPlanetIds);
 
   // ---------- Create engine & disk entity once ----------
   useEffect(() => {
@@ -118,6 +119,27 @@ export function AccretionDiskCanvas() {
       ctx.fillRect(0, 0, width, height);
 
       for (const r of renderables) {
+        // ---- determine if this renderable belongs to a permanent planet ----
+        let entityId = '';
+        let isPermanent = false;
+        let isHighlighted = false;
+
+        if (r.id.includes('-planet')) {
+          entityId = r.id.slice(0, r.id.length - '-planet'.length);
+          isPermanent = entityId.startsWith('favorite-');
+          isHighlighted = highlightedPlanetIds.includes(entityId);
+        } else if (r.id.includes('-label')) {
+          entityId = r.id.slice(0, r.id.length - '-label'.length);
+          isPermanent = entityId.startsWith('favorite-');
+          isHighlighted = highlightedPlanetIds.includes(entityId);
+        } else if (r.id.includes('-orbit')) {
+          entityId = r.id.slice(0, r.id.length - '-orbit'.length);
+          isPermanent = entityId.startsWith('favorite-');
+          // orbits aren't highlighted separately, just dimmed with the planet
+        }
+
+        const isDimmed = isPermanent && !isHighlighted;
+
         if (r.type === 'particle') {
           ctx.beginPath();
           ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
@@ -134,28 +156,32 @@ export function AccretionDiskCanvas() {
         } else if (r.type === 'circle') {
           ctx.beginPath();
           if (r.meta?.isOrbit) {
-            ctx.strokeStyle = r.color;
+            ctx.strokeStyle = isDimmed ? 'rgba(255,255,255,0.05)' : r.color;
             ctx.lineWidth = r.size || 1;
             ctx.arc(r.x, r.y, r.radius ?? 100, 0, Math.PI * 2);
             ctx.stroke();
           } else {
-            ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
+            // Planet body
+            const radius = isDimmed ? r.size * 0.5 : (isHighlighted ? r.size * 1.4 : r.size);
+            ctx.globalAlpha = isDimmed ? 0.3 : 1;
+            ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
             ctx.fillStyle = r.color;
             ctx.shadowColor = r.color;
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = isHighlighted ? 30 : (isDimmed ? 4 : 12);
             ctx.fill();
             ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
           }
         } else if (r.type === 'text') {
           ctx.font = `${r.size || 12}px "Space Mono", monospace`;
           ctx.fillStyle = r.color;
-          ctx.globalAlpha = r.opacity;
+          ctx.globalAlpha = isDimmed ? 0.3 : r.opacity;
           ctx.fillText((r.meta?.text as string) ?? '', r.x, r.y);
           ctx.globalAlpha = 1;
         }
       }
 
-      // Central star (still drawn here for now – could become a 'star' entity later)
+      // Central star
       const cx = width / 2;
       const cy = height / 2;
       const starRadius = 20 + 15 * (gravity / 500) * (0.8 + 0.4 * Math.sin(Date.now() * 0.003));
@@ -182,7 +208,7 @@ export function AccretionDiskCanvas() {
         ctx.stroke();
       }
     },
-    [gravity]
+    [gravity, highlightedPlanetIds]
   );
 
   // ---------- Animation loop ----------

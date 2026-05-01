@@ -10,43 +10,37 @@ export function CosmicInput() {
   const inputRef = useRef<HTMLInputElement>(null);
   const interestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ---------- Zustand ----------
   const {
     setUserInput,
     isModelLoading,
     isProcessing,
     sentimentScore,
+    planetEntities,
     addOrUpdatePlanet,
+    addHighlight,
   } = useUniverseStore();
 
-  // ---------- Sentiment worker ----------
   const { analyze } = useSentimentWorker();
 
-  // ---------- Flare pulse state ----------
   const [flare, setFlare] = useState<'positive' | 'negative' | null>(null);
-
-  // Track previous processing state to detect the falling edge
   const prevProcessingRef = useRef(isProcessing);
 
-  // ---------- Auto‑focus ----------
+  // Auto-focus
   useEffect(() => {
     requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
   }, []);
 
-  // ---------- Flare effect (only when processing ends) ----------
+  // Flare effect
   useEffect(() => {
     const wasProcessing = prevProcessingRef.current;
     prevProcessingRef.current = isProcessing;
 
     if (!isProcessing && wasProcessing && sentimentScore !== 0) {
-      const mood: 'positive' | 'negative' =
-        sentimentScore > 0.1 ? 'positive' : 'negative';
-      // Defer to avoid synchronous setState in effect
+      const mood: 'positive' | 'negative' = sentimentScore > 0.1 ? 'positive' : 'negative';
       const showTimer = setTimeout(() => setFlare(mood), 0);
       const clearTimer = setTimeout(() => setFlare(null), 600);
-
       return () => {
         clearTimeout(showTimer);
         clearTimeout(clearTimer);
@@ -54,7 +48,7 @@ export function CosmicInput() {
     }
   }, [isProcessing, sentimentScore]);
 
-  // ---------- Debounced interest detection ----------
+  // Debounced interest detection + highlight
   useEffect(() => {
     if (interestTimerRef.current) {
       clearTimeout(interestTimerRef.current);
@@ -64,9 +58,33 @@ export function CosmicInput() {
     if (text.length === 0) return;
 
     interestTimerRef.current = setTimeout(() => {
-      const newPlanets = detectInterests(text);
-      for (const planet of newPlanets) {
-        addOrUpdatePlanet(planet);
+      const detected = detectInterests(text);
+
+      for (const planet of detected) {
+        const keyword = planet.id.split('-')[1];
+        if (!keyword) continue;
+
+        // Check if a planet for this keyword already exists (favorite or interest)
+        const existing = planetEntities.find(
+          (p) => p.type === 'planet' && p.id.endsWith(`-${keyword}`)
+        );
+
+        if (!existing) {
+          addOrUpdatePlanet(planet);
+        }
+
+        // Highlight all planets matching this keyword
+        const matchingIds = planetEntities
+          .filter((p) => p.type === 'planet' && p.id.endsWith(`-${keyword}`))
+          .map((p) => p.id);
+
+        if (!existing) {
+          matchingIds.push(planet.id); // newly created
+        }
+
+        for (const id of matchingIds) {
+          addHighlight(id);
+        }
       }
     }, 800);
 
@@ -75,13 +93,13 @@ export function CosmicInput() {
         clearTimeout(interestTimerRef.current);
       }
     };
-  }, [localValue, addOrUpdatePlanet]);
+  }, [localValue, planetEntities, addOrUpdatePlanet, addHighlight]);
 
-  // ---------- Input handler ----------
+  // Input handler
   const handleChange = (text: string) => {
     setLocalValue(text);
     setUserInput(text);
-    analyze(text); // debounced inside the hook
+    analyze(text);
   };
 
   const handleSubmit = (e: FormEvent) => {

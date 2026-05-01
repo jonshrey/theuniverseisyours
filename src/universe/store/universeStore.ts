@@ -1,47 +1,60 @@
+// src/universe/store/universeStore.ts
 import { create } from 'zustand';
 import type { CelestialEntity } from '../../lib/types';
 
 interface UniverseState {
-  // Existing
+  // Sentiment & mood
   sentimentScore: number;
   isModelLoading: boolean;
   isProcessing: boolean;
   userInput: string;
   gravity: number;
 
-  // New
+  // Planets
   planetEntities: CelestialEntity[];
 
-  // Existing actions
+  // Highlight on mention
+  highlightedPlanetIds: string[];
+
+  // Selected planet for detail view
+  selectedPlanetId: string | null;
+
+  // Sentiment actions
   setSentimentScore: (score: number) => void;
   setModelLoading: (loading: boolean) => void;
   setProcessing: (processing: boolean) => void;
   setUserInput: (input: string) => void;
   resetSentiment: () => void;
 
-  // New actions
+  // Planet actions
   addOrUpdatePlanet: (planet: CelestialEntity) => void;
   removePlanet: (id: string) => void;
+
+  // Highlight actions
+  addHighlight: (planetId: string, duration?: number) => void;
+
+  // Selection action
+  setSelectedPlanetId: (id: string | null) => void;
 }
 
 const sentimentToGravity = (score: number): number => {
   const clamped = Math.max(-1, Math.min(1, score));
-  return 100 + (clamped + 1) * 150; // 100 (-1) → 400 (+1)
+  return 100 + (clamped + 1) * 150;
 };
 
 export const useUniverseStore = create<UniverseState>((set, get) => ({
-  // ---------- Initial state ----------
   sentimentScore: 0.0,
   isModelLoading: false,
   isProcessing: false,
   userInput: '',
-  gravity: sentimentToGravity(0.0), // 250 – neutral
+  gravity: sentimentToGravity(0.0),
   planetEntities: [],
+  highlightedPlanetIds: [],
+  selectedPlanetId: null,
 
-  // ---------- Sentiment ----------
   setSentimentScore: (rawScore: number) => {
     const current = get().sentimentScore;
-    const smoothed = current + 0.3 * (rawScore - current);
+    const smoothed = current + 0.7 * (rawScore - current);
     const gravity = sentimentToGravity(smoothed);
     set({ sentimentScore: smoothed, gravity });
   },
@@ -56,7 +69,6 @@ export const useUniverseStore = create<UniverseState>((set, get) => ({
       gravity: sentimentToGravity(0.0),
     }),
 
-  // ---------- Planets ----------
   addOrUpdatePlanet: (planet) =>
     set((state) => {
       const idx = state.planetEntities.findIndex((p) => p.id === planet.id);
@@ -72,4 +84,17 @@ export const useUniverseStore = create<UniverseState>((set, get) => ({
     set((state) => ({
       planetEntities: state.planetEntities.filter((p) => p.id !== id),
     })),
+
+  addHighlight: (planetId, duration = 1200) => {
+    set((state) => ({
+      highlightedPlanetIds: [...state.highlightedPlanetIds, planetId],
+    }));
+    setTimeout(() => {
+      set((state) => ({
+        highlightedPlanetIds: state.highlightedPlanetIds.filter((id) => id !== planetId),
+      }));
+    }, duration);
+  },
+
+  setSelectedPlanetId: (id) => set({ selectedPlanetId: id }),
 }));
